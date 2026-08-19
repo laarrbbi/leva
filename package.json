@@ -1,0 +1,39 @@
+{
+  "name": "leva",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QR + NFC in-store feedback and Google review kiosk",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:migrate": "node --conditions=react-server --import tsx scripts/migrate.ts",
+    "db:seed": "node --conditions=react-server --import tsx scripts/seed.ts",
+    "test": "node --conditions=react-server --import tsx --import ./tests/setup.ts --test \"tests/*.test.ts\""
+  },
+  "dependencies": {
+    "better-sqlite3": "12.4.1",
+    "next": "16.3.1",
+    "qrcode": "1.5.4",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "server-only": "^0.0.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.14",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.18.6",
+    "@types/qrcode": "1.5.5",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.1",
+    "tailwindcss": "4.1.14",
+    "tsx": "4.20.6",
+    "typescript": "5.9.2"
+  }
+}

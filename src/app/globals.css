@@ -1,0 +1,392 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   Leva design tokens
+
+   Everything visual is defined once, here. No component invents a colour, a
+   duration or an easing curve — if a value is needed twice it becomes a token.
+
+   Motion values follow the rules in docs/05-design-system.md:
+     - enter/exit  -> ease-out (fast start = the interface feels responsive)
+     - on-screen   -> ease-in-out
+     - never       -> ease-in (delays the frame the user is watching most)
+   ========================================================================== */
+
+@theme {
+  /* --- Typography ------------------------------------------------------ */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+
+  /* --- Easing ---------------------------------------------------------- *
+   * The built-in CSS easings are too weak to read as intentional. These are
+   * stronger variants; the drawer curve is Ionic's iOS sheet curve.         */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* --- Duration -------------------------------------------------------- *
+   * Ceiling of 300ms for anything the user triggers. Press feedback is the
+   * fastest because it is the one the finger is still touching.            */
+  --duration-press: 140ms;
+  --duration-hover: 180ms;
+  --duration-pop: 200ms;
+  --duration-step: 260ms;
+  --duration-sheet: 320ms;
+
+  /* --- Radii ----------------------------------------------------------- */
+  --radius-field: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-pill: 999px;
+}
+
+/* --------------------------------------------------------------------------
+   Palette
+
+   Defined on bare `:root` so a colour always has a value, then overridden for
+   dark mode. Never define a colour only inside a media query.
+   -------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces — a warm off-white, not pure #fff: less glare under shop lighting. */
+  --canvas: oklch(0.985 0.004 85);
+  --surface: oklch(1 0 0);
+  --surface-sunken: oklch(0.965 0.005 85);
+  --surface-raised: oklch(1 0 0);
+
+  /* Text */
+  --ink: oklch(0.22 0.015 265);
+  --ink-muted: oklch(0.52 0.015 265);
+  --ink-subtle: oklch(0.66 0.012 265);
+  --ink-inverse: oklch(0.99 0 0);
+
+  /* Lines */
+  --line: oklch(0.91 0.006 265);
+  --line-strong: oklch(0.85 0.008 265);
+
+  /* Brand */
+  --brand: oklch(0.53 0.19 272);
+  --brand-hover: oklch(0.48 0.19 272);
+  --brand-soft: oklch(0.95 0.03 272);
+  --brand-ring: oklch(0.53 0.19 272 / 0.35);
+
+  /* Stars — amber reads as "rating" instantly; no legend needed. */
+  --star: oklch(0.79 0.16 78);
+  --star-empty: oklch(0.89 0.012 265);
+
+  /* Status */
+  --positive: oklch(0.62 0.15 155);
+  --positive-soft: oklch(0.95 0.04 155);
+  --caution: oklch(0.72 0.15 65);
+  --caution-soft: oklch(0.96 0.05 65);
+  --critical: oklch(0.58 0.2 22);
+  --critical-soft: oklch(0.96 0.03 22);
+
+  /* Elevation — semi-transparent shadows, never a solid border, so cards sit
+     on the page instead of being drawn onto it. */
+  --shadow-sm: 0 1px 2px oklch(0.22 0.015 265 / 0.06);
+  --shadow-card: 0 1px 2px oklch(0.22 0.015 265 / 0.05), 0 8px 24px oklch(0.22 0.015 265 / 0.06);
+  --shadow-lift: 0 2px 4px oklch(0.22 0.015 265 / 0.06), 0 16px 40px oklch(0.22 0.015 265 / 0.1);
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --canvas: oklch(0.17 0.012 265);
+    --surface: oklch(0.21 0.014 265);
+    --surface-sunken: oklch(0.15 0.012 265);
+    --surface-raised: oklch(0.245 0.015 265);
+
+    --ink: oklch(0.96 0.004 265);
+    --ink-muted: oklch(0.72 0.012 265);
+    --ink-subtle: oklch(0.58 0.012 265);
+    --ink-inverse: oklch(0.17 0.012 265);
+
+    --line: oklch(0.3 0.014 265);
+    --line-strong: oklch(0.38 0.016 265);
+
+    --brand: oklch(0.72 0.15 272);
+    --brand-hover: oklch(0.78 0.15 272);
+    --brand-soft: oklch(0.28 0.06 272);
+    --brand-ring: oklch(0.72 0.15 272 / 0.4);
+
+    --star: oklch(0.82 0.15 78);
+    --star-empty: oklch(0.33 0.014 265);
+
+    --positive: oklch(0.72 0.15 155);
+    --positive-soft: oklch(0.28 0.05 155);
+    --caution: oklch(0.78 0.14 65);
+    --caution-soft: oklch(0.3 0.05 65);
+    --critical: oklch(0.68 0.18 22);
+    --critical-soft: oklch(0.28 0.06 22);
+
+    --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
+    --shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 8px 24px oklch(0 0 0 / 0.35);
+    --shadow-lift: 0 2px 4px oklch(0 0 0 / 0.45), 0 16px 40px oklch(0 0 0 / 0.5);
+  }
+}
+
+/* Expose the palette to Tailwind utilities (bg-surface, text-ink, ...). */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-star: var(--star);
+  --color-star-empty: var(--star-empty);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Never bounce the whole page on a kiosk device. */
+  overscroll-behavior-y: none;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  /* Comfortable leading for body copy; headings tighten it below. */
+  line-height: 1.55;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tracking is size-specific. Large text reads too loose at 0, small text too
+   tight — a single letter-spacing value is wrong somewhere by definition. */
+.type-display {
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.028em;
+  font-weight: 680;
+}
+
+.type-title {
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.018em;
+  font-weight: 640;
+}
+
+.type-heading {
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  letter-spacing: -0.011em;
+  font-weight: 600;
+}
+
+.type-body {
+  font-size: 1rem;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+.type-caption {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  /* Positive tracking: small text needs the extra air to stay legible. */
+  letter-spacing: 0.006em;
+  color: var(--ink-muted);
+}
+
+.type-numeric {
+  font-variant-numeric: tabular-nums;
+  /* Stops a changing figure from jittering its neighbours as digits swap. */
+  font-feature-settings: 'tnum';
+}
+
+/* --------------------------------------------------------------------------
+   Focus
+
+   One ring, everywhere, keyboard-only. `:focus-visible` keeps it off mouse and
+   touch presses where it reads as a rendering bug.
+   -------------------------------------------------------------------------- */
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Motion primitives
+   -------------------------------------------------------------------------- */
+
+/* Press feedback. Every pressable surface gets this — it is the cheapest way
+   to make an interface feel like it heard you. */
+.pressable {
+  transition: transform var(--duration-press) var(--ease-out-strong);
+  /* Kill the grey tap flash so our own feedback is the only thing you see. */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Hover lift, gated: touch devices fire :hover on tap, which would leave an
+   element stuck in its hover state after the finger lifts. */
+@media (hover: hover) and (pointer: fine) {
+  .hoverable {
+    transition:
+      transform var(--duration-hover) var(--ease-out-strong),
+      box-shadow var(--duration-hover) var(--ease-out-strong);
+  }
+
+  .hoverable:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* Step transitions in the customer flow. Entering from scale(0.98), never
+   scale(0) — nothing in the real world appears out of nothing. */
+.step-enter {
+  animation: step-in var(--duration-step) var(--ease-out-strong) both;
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Staggered list entry. Delays stay short — 40ms steps read as one cascade,
+   150ms steps read as a slow interface. */
+.stagger > * {
+  opacity: 0;
+  animation: rise-in var(--duration-step) var(--ease-out-strong) forwards;
+}
+
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 240ms; }
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Translucent chrome. Content scrolls under it rather than being cut off by an
+   opaque strip. */
+.chrome {
+  background-color: color-mix(in oklch, var(--surface) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* --------------------------------------------------------------------------
+   Accessibility
+
+   Reduced motion means gentler, not absent: opacity still carries the state
+   change, movement stops.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .step-enter,
+  .stagger > * {
+    animation: fade-in 200ms ease both;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hoverable:hover {
+      transform: none;
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.2s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.2s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Frosted surfaces become solid when the user asks for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  .chrome {
+    background-color: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: oklch(0.62 0.01 265);
+    --ink-muted: oklch(0.36 0.015 265);
+  }
+}
+
+/* Screen-reader-only, but focusable (used by the skip link). */
+.sr-only:not(:focus):not(:active) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}

@@ -17,9 +17,13 @@ are attractive on their own:
 | The feedback record | It decides who gets praised and who gets managed out | Fabricated ratings; a real employee harmed |
 | Customer comments | Free text, written in confidence | Re-identification of a complaining customer |
 | The admin session | Full control of all of the above | Total compromise, silently |
+| **Order prices** | Free bread, at scale, from a phone | Stock walking out of the shop unpaid |
+| **Order tracking links** | Customer names, cars, phone numbers | A stranger reading who is parked outside |
 
-The single unauthenticated write endpoint — `POST /api/feedback` — is the widest
-part of the attack surface, and most of the design below exists because of it.
+There are two unauthenticated write endpoints — `POST /api/feedback` and
+`POST /api/pedidos` — and they are the widest part of the attack surface. Most
+of the design below exists because of them. The ordering endpoint is the more
+sensitive of the two, because it is the only one attached to money.
 
 ---
 
@@ -117,10 +121,10 @@ it relies on the Origin check alone. That is sufficient, because a forged login
 cannot read the response and cannot log the victim into the attacker's account
 (the session is minted fresh after authentication, never adopted).
 
-### 3.4 Abuse of the public endpoint
+### 3.4 Abuse of the public endpoints
 
-The feedback endpoint is unauthenticated by necessity — customers do not have
-accounts. Five layers stand in for authentication:
+Both public endpoints are unauthenticated by necessity — customers do not have
+accounts, and requiring one would kill the product. Five layers stand in for authentication:
 
 1. **Single-use visit tokens** (`repositories/visit-tokens.ts`). The kiosk page
    mints one per render; submitting burns it. The `used_at IS NULL` guard is
@@ -149,6 +153,58 @@ bot that gets tuned to pass next time.
 | Open redirect | The Google link is constrained to an allowlist of Google hostnames, matched on the **whole** hostname (so `g.page.evil.com` fails). The second-platform link cannot be host-allowlisted, so it is constrained to `https:`, which rules out `javascript:`, `data:` and `file:`. Both are named explicitly in the audit trail. |
 | Header / log injection | Control characters are stripped from every free-text field before storage. |
 | Path traversal | The store slug is `^[a-z0-9]+(-[a-z0-9]+)*$` and is never used as a filesystem path. |
+
+### 3.6 Money and the ordering module
+
+**The browser lies.** This is the single rule the ordering module is built
+around, and it is stated as such in the concept document.
+
+`POST /api/pedidos` accepts product **ids and quantities**. It does not accept a
+price, a product name, or a total — those fields are simply not in the schema,
+so there is nothing to tamper with. `order-service.ts` re-reads every product
+from the database and computes the total there:
+
+```
+client sends:  [{ productId: 7, quantity: 1, priceCents: 1 }]
+server stores: 1 × "Tarta de queso" @ 1800 cents = 1800 cents
+```
+
+The extra `priceCents` is parsed away and ignored. A test asserts this exact
+case, and it was verified against the running server.
+
+Related properties, each with a reason:
+
+| Property | Why |
+| --- | --- |
+| Integer cents everywhere, `CHECK (price_cents >= 0)` | `0.1 + 0.2 !== 0.3`. A float in a till is a rounding bug waiting for a busy Saturday |
+| Duplicate lines merged before pricing | Otherwise the same product sent twice slips past the per-line quantity cap |
+| Sold-out and inactive products excluded by the *query* | Availability is decided by the database at the moment of ordering, not by whatever the menu said when the page loaded |
+| Line items copy name and price | Tomorrow's price rise must not rewrite yesterday's ticket |
+| Payment status separate from fulfilment status | The bread and the money are different things; conflating them is how an order gets handed over unpaid |
+| `paymentMethod: "online"` rejected outright | Until Stripe is wired, accepting it would create orders nobody can charge |
+| Collection is a compare-and-set | A second tap on the tablet cannot post the takings twice |
+| State transitions guarded inside the `UPDATE` | Two staff tapping one card produce one transition; the loser is told to refresh |
+
+**The tracking link.** An order's page is reached by a 24-byte random token and
+nothing else — no login, matching the document's "cero registro". That token is
+therefore a bearer credential: the page sets `noindex`, `no-referrer`, and the
+SSE stream is rate-limited per address. The customer's page is served a
+*narrowed* projection (`OrderTracking`) that carries no phone number, no address
+and no other order.
+
+**The staff stream and the CSV** carry names, vehicles and phone numbers, so
+both are behind the same session check as every other admin surface and return
+401 to anyone else.
+
+**CSV formula injection.** A cell beginning `=`, `+`, `-` or `@` is executed as
+a formula by Excel and LibreOffice. A customer could name their car
+`=cmd|'/c calc'!A1` and get code execution on the bookkeeper's machine when they
+open the daily export. Every field is prefixed with an apostrophe when it starts
+with one of those characters, which makes the cell inert text.
+
+**Retention.** `anonymiseOldOrders()` scrubs the name, vehicle, phone and notes
+after 30 days, exactly as the document specifies, while the sales figures stay.
+The value of an order is business data; who was driving is not.
 
 ### 3.6 Response headers
 
@@ -231,6 +287,7 @@ attack in progress.
 
 | Not implemented | Why | When to revisit |
 | --- | --- | --- |
+| Stripe / online payment | Fase 1 collects at the car by design, so no card data or webhook surface exists yet | Fase 2. The webhook must verify the signature, be idempotent on the session id, and cross-check the amount against the order total before marking it paid |
 | Multi-factor authentication | One or two admins on a small shop app; TOTP enrolment and recovery codes are real complexity and a real support burden | Before a multi-tenant version, or any deployment with more than a handful of admins |
 | Distributed rate limiting (Redis) | Limits live in SQLite and hold across instances sharing the file. Fine for one shop | When the app runs on more than one node with separate storage |
 | CSP violation reporting | Needs an endpoint and somewhere to send it | When there is somewhere to send it |

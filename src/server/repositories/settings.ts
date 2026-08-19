@@ -19,6 +19,11 @@ interface SettingsRow {
   pickup_name: string;
   pickup_tagline: string;
   pickup_url: string | null;
+  pickup_accepting_orders: number;
+  pickup_prep_minutes: number;
+  pickup_bay_count: number;
+  pickup_currency: string;
+  pickup_closed_message: string;
 }
 
 const FALLBACK: StoreSettings = {
@@ -37,6 +42,12 @@ const FALLBACK: StoreSettings = {
   pickupName: 'Pedidos desde el coche',
   pickupTagline: 'Pide sin bajarte del coche.',
   pickupUrl: null,
+  pickupAcceptingOrders: true,
+  pickupPrepMinutes: 5,
+  pickupBayCount: 6,
+  pickupCurrency: 'EUR',
+  pickupClosedMessage:
+    'Ahora mismo no estamos aceptando pedidos. Te esperamos en el mostrador.',
 };
 
 function toDomain(row: SettingsRow): StoreSettings {
@@ -56,13 +67,20 @@ function toDomain(row: SettingsRow): StoreSettings {
     pickupName: row.pickup_name,
     pickupTagline: row.pickup_tagline,
     pickupUrl: row.pickup_url,
+    pickupAcceptingOrders: row.pickup_accepting_orders === 1,
+    pickupPrepMinutes: row.pickup_prep_minutes,
+    pickupBayCount: row.pickup_bay_count,
+    pickupCurrency: row.pickup_currency,
+    pickupClosedMessage: row.pickup_closed_message,
   };
 }
 
 const SELECT = `SELECT slug, store_name, welcome_headline, welcome_subline, thanks_headline,
                        thanks_subline, google_review_url, google_place_id,
                        ask_for_staff_rating, ask_for_wishes, ask_for_comment,
-                       pickup_enabled, pickup_name, pickup_tagline, pickup_url
+                       pickup_enabled, pickup_name, pickup_tagline, pickup_url,
+                       pickup_accepting_orders, pickup_prep_minutes, pickup_bay_count,
+                       pickup_currency, pickup_closed_message
                   FROM store_settings WHERE id = 1`;
 
 /** Never throws: an unseeded database renders sensible placeholder copy. */
@@ -85,11 +103,15 @@ export function upsertSettings(input: StoreSettings): void {
          id, slug, store_name, welcome_headline, welcome_subline, thanks_headline,
          thanks_subline, google_review_url, google_place_id,
          ask_for_staff_rating, ask_for_wishes, ask_for_comment,
-         pickup_enabled, pickup_name, pickup_tagline, pickup_url, updated_at
+         pickup_enabled, pickup_name, pickup_tagline, pickup_url,
+         pickup_accepting_orders, pickup_prep_minutes, pickup_bay_count,
+         pickup_currency, pickup_closed_message, updated_at
        ) VALUES (1, @slug, @storeName, @welcomeHeadline, @welcomeSubline, @thanksHeadline,
                  @thanksSubline, @googleReviewUrl, @googlePlaceId,
                  @askForStaffRating, @askForWishes, @askForComment,
                  @pickupEnabled, @pickupName, @pickupTagline, @pickupUrl,
+                 @pickupAcceptingOrders, @pickupPrepMinutes, @pickupBayCount,
+                 @pickupCurrency, @pickupClosedMessage,
                  strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
        ON CONFLICT (id) DO UPDATE SET
          slug = excluded.slug,
@@ -107,6 +129,11 @@ export function upsertSettings(input: StoreSettings): void {
          pickup_name = excluded.pickup_name,
          pickup_tagline = excluded.pickup_tagline,
          pickup_url = excluded.pickup_url,
+         pickup_accepting_orders = excluded.pickup_accepting_orders,
+         pickup_prep_minutes = excluded.pickup_prep_minutes,
+         pickup_bay_count = excluded.pickup_bay_count,
+         pickup_currency = excluded.pickup_currency,
+         pickup_closed_message = excluded.pickup_closed_message,
          updated_at = excluded.updated_at`,
     )
     .run({
@@ -125,5 +152,28 @@ export function upsertSettings(input: StoreSettings): void {
       pickupName: input.pickupName,
       pickupTagline: input.pickupTagline,
       pickupUrl: input.pickupUrl || null,
+      pickupAcceptingOrders: input.pickupAcceptingOrders ? 1 : 0,
+      pickupPrepMinutes: input.pickupPrepMinutes,
+      pickupBayCount: input.pickupBayCount,
+      pickupCurrency: input.pickupCurrency,
+      pickupClosedMessage: input.pickupClosedMessage,
     });
+}
+
+/**
+ * Flips only the "are we taking orders right now?" switch.
+ *
+ * Separate from `upsertSettings` because the counter hits it mid-rush, and
+ * making a pause depend on a valid full settings form would mean the button
+ * fails exactly when it is needed most.
+ */
+export function setAcceptingOrders(accepting: boolean): void {
+  getDb()
+    .prepare(
+      `UPDATE store_settings
+          SET pickup_accepting_orders = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+        WHERE id = 1`,
+    )
+    .run(accepting ? 1 : 0);
 }

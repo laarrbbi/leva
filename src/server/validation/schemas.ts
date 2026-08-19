@@ -172,6 +172,14 @@ export const settingsSchema = z.object({
   pickupName: cleanText(LIMITS.storeNameMaxLength),
   pickupTagline: cleanText(LIMITS.copyMaxLength),
   pickupUrl: platformUrlSchema,
+  pickupAcceptingOrders: checkbox,
+  // Shown to the customer as "unos N minutos". Bounded so a typo cannot promise
+  // a wait of zero or of a day and a half.
+  pickupPrepMinutes: z.coerce.number().int().min(1).max(120),
+  // How many per-bay QR posters the Tags page generates.
+  pickupBayCount: z.coerce.number().int().min(0).max(40),
+  pickupCurrency: z.enum(['EUR', 'USD', 'GBP']),
+  pickupClosedMessage: cleanText(LIMITS.copyMaxLength),
 });
 
 // ---------------------------------------------------------------------------
@@ -193,3 +201,81 @@ export const suggestionSchema = z.object({
 });
 
 export const idSchema = z.coerce.number().int().positive();
+
+// ---------------------------------------------------------------------------
+// "Pedidos desde el coche" — ordering
+// ---------------------------------------------------------------------------
+
+/**
+ * What the browser is allowed to say about an order.
+ *
+ * Note what is absent: no prices, no product names, no total. The client sends
+ * ids and quantities; every currency figure is re-derived from the products
+ * table. A customer with devtools open cannot buy the cheesecake for 1 cent.
+ */
+export const orderLineSchema = z.object({
+  productId: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().int().min(1).max(LIMITS.maxQuantityPerLine),
+});
+
+export const orderInputSchema = z.object({
+  lines: z.array(orderLineSchema).min(1).max(LIMITS.maxOrderLines),
+
+  /** Parking bay from the QR poster. Free text so "3", "B2" and "junto a la puerta" all work. */
+  bay: cleanText(LIMITS.bayMaxLength).optional().nullable(),
+  /** How the staff will recognise the car. The one field that must not be empty. */
+  vehicle: cleanText(LIMITS.vehicleMaxLength).pipe(z.string().min(2, 'Describe tu coche')),
+  customerName: cleanText(LIMITS.customerNameMaxLength).pipe(z.string().min(1, 'Escribe tu nombre')),
+  /** Optional, and only used to call if something is wrong with the order. */
+  phone: cleanText(32).optional().nullable(),
+  notes: cleanText(LIMITS.orderNotesMaxLength).optional().nullable(),
+
+  // Fase 1 collects at the car. 'online' is accepted by the schema so the
+  // Stripe phase does not need a schema change, and rejected by the service
+  // until payments are wired.
+  paymentMethod: z.enum(['terminal', 'online']).default('terminal'),
+  source: z.enum(['qr', 'nfc', 'link']).default('qr'),
+
+  /** Honeypot — see feedbackInputSchema. */
+  website: z.string().max(200).optional().nullable(),
+  elapsedMs: z.coerce.number().int().min(0).max(1000 * 60 * 60 * 6).optional(),
+});
+
+export type OrderInput = z.infer<typeof orderInputSchema>;
+
+/** A price typed as "4,20" or "4.20" becomes 420 cents. Never a float. */
+export const priceInputSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{1,5}([.,]\d{1,2})?$/, 'Escribe un precio como 4,20')
+  .transform((value) => {
+    const [whole, fraction = ''] = value.replace(',', '.').split('.');
+    return Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  });
+
+export const categorySchema = z.object({
+  name: cleanText(60).pipe(z.string().min(1, 'Requerido')),
+  isActive: checkbox,
+});
+
+export const productSchema = z.object({
+  categoryId: z.coerce.number().int().positive(),
+  name: cleanText(80).pipe(z.string().min(1, 'Requerido')),
+  description: cleanText(160),
+  priceCents: priceInputSchema,
+  /** A single emoji stands in for a photo until object storage exists. */
+  emoji: cleanText(8),
+  imageUrl: platformUrlSchema,
+  isActive: checkbox,
+});
+
+export const orderTransitionSchema = z.object({
+  orderId: idSchema,
+  from: z.enum(['pending_payment', 'new', 'preparing', 'ready', 'delivered', 'cancelled']),
+  to: z.enum(['pending_payment', 'new', 'preparing', 'ready', 'delivered', 'cancelled']),
+});
+
+/** A service date as YYYY-MM-DD. Used for the daily close. */
+export const serviceDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha no válida');

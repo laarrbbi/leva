@@ -24,6 +24,11 @@ const validSettings = {
   pickupName: 'Pedidos desde el coche',
   pickupTagline: '',
   pickupUrl: '',
+  pickupAcceptingOrders: 'true',
+  pickupPrepMinutes: '5',
+  pickupBayCount: '6',
+  pickupCurrency: 'EUR',
+  pickupClosedMessage: 'cerrado',
 };
 
 test('an unchecked checkbox stays false', () => {

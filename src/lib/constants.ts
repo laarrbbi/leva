@@ -13,6 +13,14 @@ export const LIMITS = {
   /** Store name and marketing copy. */
   storeNameMaxLength: 80,
   copyMaxLength: 240,
+  /** Ordering: bounds that keep one order from becoming a denial-of-service. */
+  maxOrderLines: 40,
+  maxQuantityPerLine: 50,
+  bayMaxLength: 24,
+  vehicleMaxLength: 60,
+  customerNameMaxLength: 40,
+  orderNotesMaxLength: 200,
+
   /** Password policy — length over composition rules (NIST SP 800-63B). */
   passwordMinLength: 12,
   passwordMaxLength: 128,

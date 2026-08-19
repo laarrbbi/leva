@@ -40,13 +40,13 @@ Conventions applied throughout:
 One row, held to one by `CHECK (id = 1)` — the table cannot fork into two
 configurations.
 
-Holds the store name and slug, the customer-facing wording, the three
-question toggles, the Google review link, and the second-platform block
-(`pickup_enabled`, `pickup_name`, `pickup_tagline`, `pickup_url`).
+Holds the store name and slug, the customer-facing wording, the three question
+toggles, the Google review link, and the `pickup_*` block that configures the
+ordering module (see below).
 
-The second platform is four columns rather than a generic key/value bag,
-specifically so its URL can be constrained and audited like any other outbound
-link. A settings bag would make that invisible.
+These are named columns rather than a generic key/value bag specifically so the
+outbound URLs can be constrained and audited like any other link, and so the
+numeric settings get real `CHECK`s. A settings bag would make both invisible.
 
 ### `admin_users`
 
@@ -200,3 +200,73 @@ Schedule the first three from cron or a scheduled container task.
 Unique constraints carry their own indexes: `store_settings.slug`,
 `admin_users.email`, `sessions.token_hash`, `staff.code`, `feedback.public_id`,
 `visit_tokens.token_hash`.
+
+---
+
+## The ordering module (migration 002)
+
+```
+ store_settings ── pickup_* columns: on/off, pause, prep minutes, bays, currency
+       │
+   ┌───┴────────┐
+   │ categories │──1:N──▶ products
+   └────────────┘             │
+                              │ 0:N (SET NULL)
+                              ▼
+   ┌────────┐            ┌─────────────┐        ┌──────────┐
+   │ orders │───1:N────▶ │ order_items │        │ payments │
+   └───┬────┘            └─────────────┘        └────┬─────┘
+       └──────────────────1:N────────────────────────┘
+```
+
+### `categories` and `products`
+
+`price_cents` is an integer with `CHECK (price_cents >= 0)`. Nothing in the
+codebase converts a price to a float at any point.
+
+`emoji` stands in for a photo so the menu ships without object storage;
+`image_url` is the upgrade path. `is_sold_out` is the flag the counter toggles
+during service — it is separate from `is_active` because "we ran out today" and
+"we stopped selling this" are different facts with different lifetimes.
+
+### `orders`
+
+Two independent state machines:
+
+```
+fulfilment:  new ──▶ preparing ──▶ ready ──▶ delivered
+                └────────┴───────────┴──────▶ cancelled
+
+payment:     due ──▶ paid_terminal | paid_online ──▶ refunded
+```
+
+They are separate columns on purpose: an order can be handed over before it is
+paid, and knowing which is which is what the amber chip on the board encodes.
+
+| Column | Note |
+| --- | --- |
+| `public_token` | 24 random bytes. The customer's entire "account" |
+| `daily_number` | The short number staff shout. Allocated inside the insert transaction, with `UNIQUE (service_date, daily_number)` as the backstop |
+| `service_date` | Local, not UTC — an order at 23:55 belongs to that day's till |
+| `vehicle` | The one field that cannot be empty. It is how staff find the car |
+| `accepted_at` / `ready_at` / `delivered_at` | One per transition. The daily summary's preparation times are derived from these rather than stored and drifting |
+| `anonymised_at` | Set by the retention sweep |
+
+### `order_items`
+
+`name_at_time` and `price_cents` are copied at order time. `product_id` is
+`ON DELETE SET NULL`, so deleting a product from the menu leaves every historic
+ticket readable and every past total unchanged.
+
+### `payments`
+
+The ledger behind the daily close. `reference` is `UNIQUE`, which gives webhook
+idempotency for free when Stripe arrives — the same payment cannot land twice.
+Fase 1 writes only `provider = 'terminal'` rows.
+
+### Retention
+
+`anonymiseOldOrders(30)` clears `customer_name`, `vehicle`, `phone`, `notes` and
+`ip_hash` after 30 days, per the concept document, and stamps `anonymised_at`.
+Totals, line items and timestamps stay: the shop's own sales history is not
+personal data once the driver is gone from it.

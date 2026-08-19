@@ -49,11 +49,25 @@ export default async function TagsPage() {
           <div className="print:hidden">
             <EmptyState
               title="No second tag yet"
-              description="Turn on the second platform under Settings and give it an https link. A separate QR code appears here."
+              description="Turn on “Pedidos desde el coche” under Settings and a separate QR code appears here — plus one poster per parking bay."
             />
           </div>
         )}
       </section>
+
+      {tags.bays.length > 0 ? (
+        <section className="flex flex-col gap-4">
+          <SectionTitle
+            title="Un cartel por plaza"
+            hint="El pedido llega con el número de plaza, así nadie tiene que buscar el coche."
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {tags.bays.map((tag) => (
+              <TagCard key={tag.id} tag={tag} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <SectionTitle

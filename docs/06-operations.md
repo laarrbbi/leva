@@ -63,6 +63,7 @@ Schedule from cron or a scheduled task:
 | Prune sessions | Daily | `pruneExpiredSessions()` |
 | Prune visit tokens | Daily | `pruneVisitTokens()` |
 | Redact old comments | Monthly | `redactOldComments(days)` — pick the window in your privacy notice |
+| Anonymise old orders | Monthly | `anonymiseOldOrders(30)` — clears name, vehicle, phone; keeps the sales figures |
 
 Rate-limit rows are swept opportunistically on the request path; no job needed.
 
@@ -85,6 +86,24 @@ Rate-limit rows are swept opportunistically on the request path; no job needed.
 3. Tighten `RULES.feedback` in `server/security/rate-limit.ts` and redeploy.
 4. If tags were physically rewritten, reprint and re-write them — and lock the
    new NFC tags read-only.
+
+### Orders stopped arriving
+
+1. Check the board's connection chip: "Sin conexión" means the browser lost the
+   stream, not that the shop lost orders — they are all still in the database.
+2. Check whether someone left **Pausar pedidos** on. The customer sees the
+   closed message and cannot order at all.
+3. Check `/pedir` loads. If it 404s, the module has been switched off in
+   Settings.
+4. Reload the tablet. The board re-reads the whole queue on connect, so nothing
+   is lost by refreshing.
+
+### The till does not balance
+
+`/admin/cierre` splits the day into collected at the car, paid online, and still
+outstanding. A non-zero "pendiente de cobro" means an order was delivered
+without anyone tapping **Cobrado** — that is the discrepancy, and the order list
+below the summary names it.
 
 ### Database corruption
 

@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { env } from '@/lib/env';
 import type { StaffMember, StoreSettings } from '@/types/domain';
 
-export type TagKind = 'review' | 'platform';
+export type TagKind = 'review' | 'platform' | 'bay';
 
 export interface Tag {
   kind: TagKind;
@@ -33,6 +33,14 @@ const QR_OPTIONS = {
   color: { dark: '#141419ff', light: '#ffffffff' },
 } as const;
 
+/** `/pedir/p/3` — the address printed under a per-bay poster. */
+function orderUrl(options: { bay?: string; source: 'qr' | 'nfc' }): string {
+  const path = options.bay ? `/pedir/p/${encodeURIComponent(options.bay)}` : '/pedir';
+  const url = new URL(path, env.APP_ORIGIN);
+  url.searchParams.set('s', options.source);
+  return url.toString();
+}
+
 function kioskUrl(slug: string, options: { staffCode?: string; source: 'qr' | 'nfc' }): string {
   const url = new URL(`/r/${encodeURIComponent(slug)}`, env.APP_ORIGIN);
   if (options.staffCode) url.searchParams.set('t', options.staffCode);
@@ -44,8 +52,10 @@ function kioskUrl(slug: string, options: { staffCode?: string; source: 'qr' | 'n
 export interface TagSet {
   store: Tag;
   people: Tag[];
-  /** Present only when the owner enabled a second platform and gave it a link. */
+  /** The ordering entry point — either the built-in menu or an external link. */
   platform: Tag | null;
+  /** One poster per parking bay, per the concept document. */
+  bays: Tag[];
 }
 
 /**
@@ -91,20 +101,46 @@ export async function buildTags(
     }),
   );
 
+  // The ordering tag. When the built-in module is on it points at our own menu;
+  // an external link is honoured only as an explicit override, so a store that
+  // has not adopted the built-in flow can still print one code.
+  const orderingHref =
+    settings.pickupEnabled && !settings.pickupUrl ? orderUrl({ source: 'qr' }) : settings.pickupUrl;
+
   const platform =
-    settings.pickupEnabled && settings.pickupUrl
+    settings.pickupEnabled && orderingHref
       ? ({
           kind: 'platform',
           id: 'platform',
-          title: settings.pickupName || 'Second platform',
-          subtitle: settings.pickupTagline || 'Its own tag, printed separately.',
-          url: settings.pickupUrl,
-          // An external destination we do not control, so there is no source
-          // marker to add — the URL is written exactly as the owner entered it.
-          nfcUrl: settings.pickupUrl,
-          qrDataUri: await QRCode.toDataURL(settings.pickupUrl, QR_OPTIONS),
+          title: settings.pickupName || 'Pedidos desde el coche',
+          subtitle: settings.pickupTagline || 'Su propio código, aparte del de reseñas.',
+          url: orderingHref,
+          nfcUrl: settings.pickupUrl ? settings.pickupUrl : orderUrl({ source: 'nfc' }),
+          qrDataUri: await QRCode.toDataURL(orderingHref, QR_OPTIONS),
         } satisfies Tag)
       : null;
 
-  return { store, people, platform };
+  // A poster per bay. The bay travels in the URL, so an order arrives already
+  // saying "Plaza 3" and nobody has to walk the car park looking for a Clio.
+  const bays: Tag[] =
+    settings.pickupEnabled && !settings.pickupUrl
+      ? await Promise.all(
+          Array.from({ length: settings.pickupBayCount }, (_, index) => String(index + 1)).map(
+            async (bay): Promise<Tag> => {
+              const url = orderUrl({ bay, source: 'qr' });
+              return {
+                kind: 'bay',
+                id: `bay-${bay}`,
+                title: `Plaza ${bay}`,
+                subtitle: 'El pedido llega ya con el número de plaza.',
+                url,
+                nfcUrl: orderUrl({ bay, source: 'nfc' }),
+                qrDataUri: await QRCode.toDataURL(url, { ...QR_OPTIONS, width: 384 }),
+              };
+            },
+          ),
+        )
+      : [];
+
+  return { store, people, platform, bays };
 }

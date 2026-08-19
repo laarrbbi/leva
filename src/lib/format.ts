@@ -40,3 +40,30 @@ export function formatWhen(iso: string): string {
 
   return new Date(then).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
+
+/**
+ * Money.
+ *
+ * Takes integer cents — the only representation used anywhere in the ordering
+ * module — and formats for display. Nothing converts to a float on the way in.
+ */
+export function formatMoney(cents: number, currency = 'EUR', locale = 'es-ES'): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
+}
+
+/** Clock time for an order timeline: "18:02". */
+export function formatClock(iso: string | null, locale = 'es-ES'): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+}
+
+/** "hace 20 s" / "hace 4 min" — how long a ticket has been waiting. */
+export function formatWaiting(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return `hace ${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `hace ${minutes} min`;
+  return `hace ${Math.floor(minutes / 60)} h`;
+}

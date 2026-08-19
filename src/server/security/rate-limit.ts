@@ -29,6 +29,7 @@ export interface RateLimitResult {
  *                   farm a pile of them and spend them later.
  *  - `login`      — online password guessing, per IP. Complements the per-account
  *                   lockout, which stops distributed guessing at one account.
+ *  - `order`      — order creation. Each one costs a person's time at the counter.
  *  - `adminWrite` — blast-radius cap on a hijacked admin session.
  */
 export const RULES = {
@@ -36,6 +37,11 @@ export const RULES = {
   visitToken: { name: 'visit-token', limit: 60, windowSeconds: 60 * 10 },
   login: { name: 'login', limit: 10, windowSeconds: 60 * 15 },
   googleClick: { name: 'google-click', limit: 30, windowSeconds: 60 * 10 },
+  // Orders are costlier than feedback: each one puts a person to work at the
+  // counter. Tight enough that nobody can flood the bakery with fake tickets,
+  // loose enough for a family placing two orders from one phone.
+  order: { name: 'order', limit: 8, windowSeconds: 60 * 10 },
+  orderTracking: { name: 'order-tracking', limit: 240, windowSeconds: 60 * 10 },
   adminWrite: { name: 'admin-write', limit: 120, windowSeconds: 60 * 5 },
 } as const satisfies Record<string, RateLimitRule>;
 

@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { logoutAction } from '@/server/actions/auth-actions';
 import { requireSession } from '@/server/auth/guard';
+import { getSettings } from '@/server/repositories/settings';
 import { CSRF_FIELD } from '@/lib/constants';
 
 /** Session state must never be cached or shared between requests. */
@@ -11,11 +12,21 @@ export const dynamic = 'force-dynamic';
  * Nav labels name their contents rather than using generic umbrellas —
  * "Wishlist" tells you what is inside, "More" does not.
  */
-const NAV = [
+const REVIEW_NAV = [
   { href: '/admin', label: 'Overview' },
   { href: '/admin/feedback', label: 'Feedback' },
   { href: '/admin/team', label: 'Team' },
   { href: '/admin/suggestions', label: 'Wishlist' },
+] as const;
+
+/** Only rendered when the owner has switched the ordering module on. */
+const ORDERING_NAV = [
+  { href: '/admin/pedidos', label: 'Pedidos' },
+  { href: '/admin/carta', label: 'Carta' },
+  { href: '/admin/cierre', label: 'Cierre' },
+] as const;
+
+const TAIL_NAV = [
   { href: '/admin/tags', label: 'Tags' },
   { href: '/admin/settings', label: 'Settings' },
   { href: '/admin/activity', label: 'Activity' },
@@ -23,6 +34,9 @@ const NAV = [
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
+  const { pickupEnabled } = getSettings();
+
+  const nav = [...REVIEW_NAV, ...(pickupEnabled ? ORDERING_NAV : []), ...TAIL_NAV];
 
   return (
     <div className="min-h-dvh bg-canvas">
@@ -38,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
           <nav aria-label="Admin sections" className="min-w-0 flex-1 overflow-x-auto">
             <ul className="flex gap-1">
-              {NAV.map((item) => (
+              {nav.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}

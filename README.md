@@ -28,17 +28,63 @@ that follows anyone.
 | Team | Add people, rename them, hide them; past ratings are always kept |
 | Wishlist | The one-tap chips customers choose from |
 | Tags | Printable QR codes and one-tap NFC writing |
-| Settings | Store name, Google link, second platform, wording, which questions to ask |
+| Settings | Store name, Google link, ordering module, wording, which questions to ask |
 | Activity | Append-only log of every admin change and sign-in attempt |
 
-### Two tags, two destinations
+---
 
-The **review tag** opens the feedback flow. A **second platform** tag can be
-switched on in Settings with its own name, tagline and https link — for a
-curbside-ordering page, a menu, a booking form — and gets its own separate QR
-code on the Tags page. One code per destination, on purpose: a single code
-serving both would need a menu in between, which costs the tap it is meant to
-save.
+## Pedidos desde el coche
+
+A second module, switched on in Settings, with its **own separate QR codes**: the
+customer parks in front of the shop, scans the poster on their bay, orders from
+their phone, and stays in the car. A bell rings on the counter tablet and the
+order appears on a board.
+
+**For the customer** — `/pedir/p/3`:
+
+1. **The menu** — categories, prices, sold-out items struck through
+2. **The basket** — total always visible at the bottom of the screen
+3. **Two fields** — "Clio blanco" and a first name. No account, no email
+4. **Live tracking** — Recibido → En preparación → ¡Vamos hacia tu coche!
+
+**For the shop:**
+
+| Section | What it is for |
+| --- | --- |
+| Pedidos | The counter board: three columns, one tap to advance, a bell on arrival |
+| Carta | Categories and products, and the one-tap "Agotado hoy" toggle |
+| Cierre | Daily close, till reconciliation, CSV export for the bookkeeper |
+
+The Tags page prints a poster **per parking bay** (`/pedir/p/1`, `/pedir/p/2`, …)
+so an order arrives already saying "Plaza 3" and nobody walks the car park
+looking for a white Clio.
+
+### Where the money is
+
+Two rules from the concept document, both enforced in code:
+
+- **The browser lies.** A request carries product ids and quantities. Prices,
+  names and the total are re-read from the database, so a customer with devtools
+  open can change what they order but never what they owe. There is a test for
+  exactly this.
+- **Money is integer cents, never a float.** `0.1 + 0.2 !== 0.3` in every
+  IEEE-754 language, and a bakery cannot round someone's change wrong.
+
+### What is not built yet
+
+**Fase 1 only — card payment is not wired.** The concept document ships Fase 1
+without Stripe on purpose: the card terminal already works in the shop, so the
+whole flow can be validated with real customers at minimum risk. Every order is
+therefore collected at the car, and the board says so with an amber chip. The
+`payments` table and the payment-status state machine already have the shape
+Stripe needs, and the API rejects `paymentMethod: "online"` outright rather than
+creating an order nobody will ever charge for.
+
+This implementation also runs on Leva's SQLite and session stack rather than the
+Supabase + Stripe pairing in the document — a second database and a second auth
+system would defeat the point of living in the same admin panel. All SQL is
+confined to `repositories/`, which is the seam a Postgres/Supabase move would go
+through.
 
 ---
 
@@ -68,7 +114,8 @@ npm run db:seed                # creates the store and your admin account
 npm run dev
 ```
 
-- Customer view: <http://localhost:3000/r/my-store>
+- Review kiosk: <http://localhost:3000/r/my-store>
+- Ordering menu: <http://localhost:3000/pedir/p/3>
 - Dashboard: <http://localhost:3000/admin>
 
 ### Environment
@@ -123,10 +170,12 @@ output plus a writable volume for the SQLite file. Two things matter:
 src/
 ├─ proxy.ts              per-request CSP with a nonce
 ├─ app/                  routes only — no business logic
-│  ├─ r/[slug]/          the customer kiosk
+│  ├─ r/[slug]/          the review kiosk
+│  ├─ pedir/             the ordering menu (generic and per-bay)
+│  ├─ pedido/[token]/    live order tracking
 │  ├─ admin/             login + (dashboard) route group
-│  └─ api/               the public feedback endpoints
-├─ components/           ui/ primitives · review/ kiosk · admin/ dashboard
+│  └─ api/               public endpoints + authenticated panel streams
+├─ components/           ui/ primitives · review/ kiosk · order/ ordering · admin/ dashboard
 ├─ server/               everything that must never reach the browser
 │  ├─ db/                connection + ordered migrations
 │  ├─ auth/              sessions, CSRF, route guards

@@ -129,20 +129,26 @@ export function SettingsForm({
 
           <Card>
             <CardHeader
-              title="Second platform"
-              description="A separate destination with its own QR and NFC tag, printed apart from the review tag."
+              title="Pedidos desde el coche"
+              description="El módulo de pedidos: carta, tablero en el mostrador y su propio QR por plaza."
             />
             <CardBody className="flex flex-col gap-4 pt-2">
               <div className="divide-y divide-line/60">
                 <Toggle
                   name="pickupEnabled"
-                  label="Give this platform its own tag"
-                  description="When off, no tag is generated and nothing links to it."
+                  label="Activar los pedidos desde el coche"
+                  description="Cuando está apagado, la carta no existe y no se genera ningún QR."
                   defaultChecked={settings.pickupEnabled}
+                />
+                <Toggle
+                  name="pickupAcceptingOrders"
+                  label="Aceptando pedidos ahora"
+                  description="También se pausa desde el tablero, con un botón, en plena hora punta."
+                  defaultChecked={settings.pickupAcceptingOrders}
                 />
               </div>
 
-              <Field label="Name" htmlFor="pickupName" error={state.fieldErrors?.pickupName}>
+              <Field label="Nombre" htmlFor="pickupName" error={state.fieldErrors?.pickupName}>
                 <Input
                   id="pickupName"
                   name="pickupName"
@@ -152,7 +158,7 @@ export function SettingsForm({
                 />
               </Field>
 
-              <Field label="Tagline" htmlFor="pickupTagline">
+              <Field label="Frase" htmlFor="pickupTagline">
                 <Input
                   id="pickupTagline"
                   name="pickupTagline"
@@ -162,11 +168,73 @@ export function SettingsForm({
                 />
               </Field>
 
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field
+                  label="Minutos de preparación"
+                  htmlFor="pickupPrepMinutes"
+                  error={state.fieldErrors?.pickupPrepMinutes}
+                  hint="Lo ve el cliente."
+                >
+                  <Input
+                    id="pickupPrepMinutes"
+                    name="pickupPrepMinutes"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={120}
+                    defaultValue={settings.pickupPrepMinutes}
+                  />
+                </Field>
+
+                <Field
+                  label="Plazas"
+                  htmlFor="pickupBayCount"
+                  error={state.fieldErrors?.pickupBayCount}
+                  hint="Un QR por plaza."
+                >
+                  <Input
+                    id="pickupBayCount"
+                    name="pickupBayCount"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={40}
+                    defaultValue={settings.pickupBayCount}
+                  />
+                </Field>
+
+                <Field label="Moneda" htmlFor="pickupCurrency">
+                  <select
+                    id="pickupCurrency"
+                    name="pickupCurrency"
+                    defaultValue={settings.pickupCurrency}
+                    className="w-full rounded-field bg-surface px-3.5 py-2.5 text-ink ring-1 ring-line focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  >
+                    <option value="EUR">EUR €</option>
+                    <option value="USD">USD $</option>
+                    <option value="GBP">GBP £</option>
+                  </select>
+                </Field>
+              </div>
+
               <Field
-                label="Link"
+                label="Mensaje cuando está en pausa"
+                htmlFor="pickupClosedMessage"
+                hint="Mejor decirlo con amabilidad que dejar pedir y fallar."
+              >
+                <Input
+                  id="pickupClosedMessage"
+                  name="pickupClosedMessage"
+                  defaultValue={settings.pickupClosedMessage}
+                  maxLength={LIMITS.copyMaxLength}
+                />
+              </Field>
+
+              <Field
+                label="Enlace externo (opcional)"
                 htmlFor="pickupUrl"
                 error={state.fieldErrors?.pickupUrl}
-                hint="Where the tag sends people. Must be a full https address."
+                hint="Solo si prefieres que el QR lleve a otra plataforma en vez de a la carta de aquí."
               >
                 <Input
                   id="pickupUrl"
@@ -178,6 +246,12 @@ export function SettingsForm({
                   maxLength={500}
                 />
               </Field>
+
+              <p className="type-caption rounded-field bg-brand-soft px-3.5 py-3 text-pretty">
+                El cobro con tarjeta desde el móvil (Stripe) llega en la Fase 2. Ahora mismo todos
+                los pedidos se cobran con el datáfono en el coche, que es exactamente como arranca
+                el plan.
+              </p>
             </CardBody>
           </Card>
 

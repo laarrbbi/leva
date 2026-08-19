@@ -79,6 +79,11 @@ export async function updateSettingsAction(
     pickupName: formData.get('pickupName'),
     pickupTagline: formData.get('pickupTagline'),
     pickupUrl: formData.get('pickupUrl'),
+    pickupAcceptingOrders: formData.get('pickupAcceptingOrders'),
+    pickupPrepMinutes: formData.get('pickupPrepMinutes'),
+    pickupBayCount: formData.get('pickupBayCount'),
+    pickupCurrency: formData.get('pickupCurrency'),
+    pickupClosedMessage: formData.get('pickupClosedMessage'),
   });
 
   if (!parsed.success) {
